@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discordanalytics"
+description = "A Python package for interacting with Discord Analytics API"
+version = "0.0.1"
+authors = [
+  {name = "ValDesign", email = "valdesign.dev@gmail.com"}
+]
+requires-python = ">=3.8"
+
+[project.urls]
+homepage = "https://github.com/DiscordAnalytics/python-package"
+issues = "https://github.com/DiscordAnalytics/python-package/issues"
