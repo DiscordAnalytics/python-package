@@ -1,11 +1,11 @@
 import discord
 
-class ApiEndpoints():
+class ApiEndpoints:
   BASE_URL = "https://discordanalytics.xyz/api"
   BOT_URL = f"{BASE_URL}/bots/:id"
   STATS_URL = f"{BASE_URL}/bots/:id/stats"
 
-class ErrorCodes():
+class ErrorCodes:
   INVALID_CLIENT_TYPE = 'Invalid client type, please use a valid client.'
   CLIENT_NOT_READY = 'Client is not ready, please start the client first.'
   INVALID_RESPONSE = 'Invalid response from the API, please try again later.'
