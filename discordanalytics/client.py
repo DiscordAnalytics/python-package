@@ -5,9 +5,7 @@ from discord.enums import InteractionType
 import requests
 import sys
 
-# from .__init__ import __version__
-
-__version__ = "0.0.1"
+from .__init__ import __version__
 
 class ApiEndpoints:
   BASE_URL = "https://discordanalytics.xyz/api"
