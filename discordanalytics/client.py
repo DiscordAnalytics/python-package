@@ -1,11 +1,13 @@
+import asyncio
 from datetime import datetime
 import discord
+from discord.enums import InteractionType
 import requests
 import sys
-import threading
-import time
 
-from .__init__ import __version__
+# from .__init__ import __version__
+
+__version__ = "0.0.1"
 
 class ApiEndpoints:
   BASE_URL = "https://discordanalytics.xyz/api"
@@ -46,19 +48,19 @@ class DiscordAnalytics():
         "huge": 0
       }
     }
-
-  def set_interval(self, func, interval, *args, **kwargs):
-    def wrapper():
-      while True:
-        func(*args, **kwargs)
-        time.sleep(interval)
-    thread = threading.Thread(target=wrapper)
-    thread.daemon = True
-    thread.start()
-    thread.join()
-    return thread
   
-  def start(self):
+  def track_events(self):
+    if not self.client.is_ready():
+      @self.client.event
+      async def on_ready():
+        self.init()
+    else:
+      self.init()
+    @self.client.event
+    async def on_interaction(interaction):
+      self.track_interactions(interaction)
+  
+  def init(self):
     if not isinstance(self.client, discord.Client):
       raise ValueError(ErrorCodes.INVALID_CLIENT_TYPE)
     if not self.client.is_ready():
@@ -92,40 +94,44 @@ class DiscordAnalytics():
       else:
         print("[DISCORDANALYTICS] DevMode is disabled. Stats will be sent every 5 minutes.")
 
-    self.set_interval(self.send_stats, 30 if "--dev" in sys.argv else 300)
+    self.client.loop.create_task(self.send_stats())
 
-  def send_stats(self):
-    if self.debug:
-      print("[DISCORDANALYTICS] Sending stats...")
-    
-    guild_count = len(self.client.guilds)
-    user_count = len(self.client.users)
-
-    response = requests.post(
-      ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id)),
-      headers=self.headers,
-      json=self.stats
-    )
-
-    if response.status_code == 401:
-      raise ValueError(ErrorCodes.INVALID_API_TOKEN)
-    if response.status_code == 423:
-      raise ValueError(ErrorCodes.SUSPENDED_BOT)
-    if response.status_code != 200:
-      raise ValueError(ErrorCodes.INVALID_RESPONSE)
-    if response.status_code == 200:
+  async def send_stats(self):
+    await self.client.wait_until_ready()
+    while not self.client.is_closed():
       if self.debug:
-        print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
+        print("[DISCORDANALYTICS] Sending stats...")
       
-      self.stats = {
-        "date": datetime.today().strftime("%Y-%m-%d"),
-        "guilds": guild_count,
-        "users": user_count,
-        "interactions": [],
-        "locales": [],
-        "guildsLocales": [],
-        "guildMembers": self.calculate_guild_members_repartition()
-      }
+      guild_count = len(self.client.guilds)
+      user_count = len(self.client.users)
+
+      response = requests.post(
+        ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id)),
+        headers=self.headers,
+        json=self.stats
+      )
+
+      if response.status_code == 401:
+        raise ValueError(ErrorCodes.INVALID_API_TOKEN)
+      if response.status_code == 423:
+        raise ValueError(ErrorCodes.SUSPENDED_BOT)
+      if response.status_code != 200:
+        raise ValueError(ErrorCodes.INVALID_RESPONSE)
+      if response.status_code == 200:
+        if self.debug:
+          print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
+        
+        self.stats = {
+          "date": datetime.today().strftime("%Y-%m-%d"),
+          "guilds": guild_count,
+          "users": user_count,
+          "interactions": [],
+          "locales": [],
+          "guildsLocales": [],
+          "guildMembers": self.calculate_guild_members_repartition()
+        }
+      
+      await asyncio.sleep(10 if "--dev" in sys.argv else 300)
 
   def calculate_guild_members_repartition(self):
     result = {
@@ -146,3 +152,64 @@ class DiscordAnalytics():
         result["huge"] += 1
 
     return result
+  
+  def track_interactions(self, interaction):
+    if self.debug:
+      print("[DISCORDANALYTICS] Track interactions triggered")
+    if not self.is_ready:
+      raise ValueError(ErrorCodes.INSTANCE_NOT_INITIALIZED)
+    
+    guilds = []
+    for guild in self.client.guilds:
+      if guild.preferred_locale is not None:
+        found = False
+        for g in guilds:
+          if g["locale"] == guild.preferred_locale.value:
+            g["count"] += 1
+            found = True
+            break
+        if not found:
+          guilds.append({
+            "locale": guild.preferred_locale.value,
+            "count": 1
+          })
+    self.stats["guildsLocales"] = guilds
+    
+    found = False
+    for data in self.stats["locales"]:
+      if data["locale"] == interaction.locale.value:
+        data["count"] += 1
+        found = True
+        break
+    if not found:
+      self.stats["locales"].append({
+        "locale": interaction.locale.value,
+        "count": 1
+      })
+
+    if interaction.type == InteractionType.application_command or interaction.type == InteractionType.autocomplete:
+      found = False
+      for data in self.stats["interactions"]:
+        if data["name"] == interaction.data["name"] and data["type"] == interaction.type.value:
+          data["count"] += 1
+          found = True
+          break
+      if not found:
+        self.stats["interactions"].append({
+          "name": interaction.data["name"],
+          "count": 1,
+          "type": interaction.type.value
+        })
+    elif interaction.type == InteractionType.component or interaction.type == InteractionType.modal_submit:
+      found = False
+      for data in self.stats["interactions"]:
+        if data["name"] == interaction.data["custom_id"] and data["type"] == interaction.type.value:
+          data["count"] += 1
+          found = True
+          break
+      if not found:
+        self.stats["interactions"].append({
+          "name": interaction.data["custom_id"],
+          "count": 1,
+          "type": interaction.type.value
+        })
