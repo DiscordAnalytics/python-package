@@ -36,9 +36,9 @@ class DiscordAnalytics():
       "date": datetime.today().strftime("%Y-%m-%d"),
       "guilds": 0,
       "users": 0,
-      "interactions": [],
-      "locales": [],
-      "guildsLocales": [],
+      "interactions": [], # {name:str, number:int, type:int}[]
+      "locales": [], # {locale:str, number:int}[]
+      "guildsLocales": [], # {locale:str, number:int}[]
       "guildMembers": {
         "little": 0,
         "medium": 0,
@@ -163,51 +163,51 @@ class DiscordAnalytics():
         found = False
         for g in guilds:
           if g["locale"] == guild.preferred_locale.value:
-            g["count"] += 1
+            g["number"] += 1
             found = True
             break
         if not found:
           guilds.append({
             "locale": guild.preferred_locale.value,
-            "count": 1
+            "number": 1
           })
     self.stats["guildsLocales"] = guilds
     
     found = False
     for data in self.stats["locales"]:
       if data["locale"] == interaction.locale.value:
-        data["count"] += 1
+        data["number"] += 1
         found = True
         break
     if not found:
       self.stats["locales"].append({
         "locale": interaction.locale.value,
-        "count": 1
+        "number": 1
       })
 
     if interaction.type == InteractionType.application_command or interaction.type == InteractionType.autocomplete:
       found = False
       for data in self.stats["interactions"]:
         if data["name"] == interaction.data["name"] and data["type"] == interaction.type.value:
-          data["count"] += 1
+          data["number"] += 1
           found = True
           break
       if not found:
         self.stats["interactions"].append({
           "name": interaction.data["name"],
-          "count": 1,
+          "number": 1,
           "type": interaction.type.value
         })
     elif interaction.type == InteractionType.component or interaction.type == InteractionType.modal_submit:
       found = False
       for data in self.stats["interactions"]:
         if data["name"] == interaction.data["custom_id"] and data["type"] == interaction.type.value:
-          data["count"] += 1
+          data["number"] += 1
           found = True
           break
       if not found:
         self.stats["interactions"].append({
           "name": interaction.data["custom_id"],
-          "count": 1,
+          "number": 1,
           "type": interaction.type.value
         })
