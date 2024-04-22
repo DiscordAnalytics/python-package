@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from typing import Literal
 import discord
 from discord.enums import InteractionType
 import requests
@@ -44,7 +45,10 @@ class DiscordAnalytics():
         "medium": 0,
         "big": 0,
         "huge": 0
-      }
+      },
+      "guildsStats": [], # {guildId:str, name:str, icon:str, members:int, interactions: int}[]
+      "addedGuilds": 0,
+      "removedGuilds": 0,
     }
   
   def track_events(self):
@@ -55,8 +59,14 @@ class DiscordAnalytics():
     else:
       self.init()
     @self.client.event
-    async def on_interaction(interaction):
+    async def on_interaction(interaction: discord.Interaction):
       self.track_interactions(interaction)
+    @self.client.event
+    async def on_guild_join(guild: discord.Guild):
+      self.trackGuilds(guild, "create")
+    @self.client.event
+    async def on_guild_remove(guild: discord.Guild):
+      self.trackGuilds(guild, "delete")
   
   def init(self):
     if not isinstance(self.client, discord.Client):
@@ -126,7 +136,10 @@ class DiscordAnalytics():
           "interactions": [],
           "locales": [],
           "guildsLocales": [],
-          "guildMembers": self.calculate_guild_members_repartition()
+          "guildMembers": self.calculate_guild_members_repartition(),
+          "guildsStats": [],
+          "addedGuilds": 0,
+          "removedGuilds": 0,
         }
       
       await asyncio.sleep(10 if "--dev" in sys.argv else 300)
@@ -151,7 +164,7 @@ class DiscordAnalytics():
 
     return result
   
-  def track_interactions(self, interaction):
+  def track_interactions(self, interaction: discord.Interaction):
     if self.debug:
       print("[DISCORDANALYTICS] Track interactions triggered")
     if not self.is_ready:
@@ -160,54 +173,66 @@ class DiscordAnalytics():
     guilds = []
     for guild in self.client.guilds:
       if guild.preferred_locale is not None:
-        found = False
-        for g in guilds:
-          if g["locale"] == guild.preferred_locale.value:
-            g["number"] += 1
-            found = True
-            break
-        if not found:
+        guild_locale = next((x for x in guilds if x["locale"] == guild.preferred_locale.value), None)
+        if guild_locale is not None:
+          guild_locale["number"] += 1
+        else:
           guilds.append({
             "locale": guild.preferred_locale.value,
             "number": 1
           })
     self.stats["guildsLocales"] = guilds
     
-    found = False
-    for data in self.stats["locales"]:
-      if data["locale"] == interaction.locale.value:
-        data["number"] += 1
-        found = True
-        break
-    if not found:
+    locale = next((x for x in self.stats["locales"] if x["locale"] == interaction.locale.value), None)
+    if locale is not None:
+      locale["number"] += 1
+    else:
       self.stats["locales"].append({
         "locale": interaction.locale.value,
         "number": 1
       })
 
     if interaction.type == InteractionType.application_command or interaction.type == InteractionType.autocomplete:
-      found = False
-      for data in self.stats["interactions"]:
-        if data["name"] == interaction.data["name"] and data["type"] == interaction.type.value:
-          data["number"] += 1
-          found = True
-          break
-      if not found:
+      interaction_data = next((x for x in self.stats["interactions"] if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value), None)
+      if interaction_data is not None:
+        interaction_data["number"] += 1
+      else:
         self.stats["interactions"].append({
           "name": interaction.data["name"],
           "number": 1,
           "type": interaction.type.value
         })
     elif interaction.type == InteractionType.component or interaction.type == InteractionType.modal_submit:
-      found = False
-      for data in self.stats["interactions"]:
-        if data["name"] == interaction.data["custom_id"] and data["type"] == interaction.type.value:
-          data["number"] += 1
-          found = True
-          break
-      if not found:
+      interaction_data = next((x for x in self.stats["interactions"] if x["name"] == interaction.data["custom_id"] and x["type"] == interaction.type.value), None)
+      if interaction_data is not None:
+        interaction_data["number"] += 1
+      else:
         self.stats["interactions"].append({
           "name": interaction.data["custom_id"],
           "number": 1,
           "type": interaction.type.value
         })
+
+    guild_data = next((x for x in self.stats["guildsStats"] if x["guildId"] == str(interaction.guild.id)), None)
+    if guild_data is not None:
+      guild_data["interactions"] += 1
+    else:
+      self.stats["guildsStats"].append({
+        "guildId": str(interaction.guild.id),
+        "name": interaction.guild.name,
+        "icon": interaction.guild.icon,
+        "members": interaction.guild.member_count,
+        "interactions": 1
+      })
+
+  # type = delete or create
+  def trackGuilds(self, guild: discord.Guild, type: Literal["create", "delete"]):
+    if self.debug:
+      print(f"[DISCORDANALYTICS] trackGuilds({type}) triggered")
+
+    if type == "create":
+      self.stats["addedGuilds"] += 1
+    elif type == "delete":
+      self.stats["removedGuilds"] += 1
+    else:
+      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
