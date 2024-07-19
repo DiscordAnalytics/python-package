@@ -49,6 +49,13 @@ class DiscordAnalytics():
       "guildsStats": [], # {guildId:str, name:str, icon:str, members:int, interactions: int}[]
       "addedGuilds": 0,
       "removedGuilds": 0,
+      "users_type": {
+        "admin": 0,
+        "moderator": 0,
+        "new_member": 0,
+        "other": 0,
+        "private_message": 0
+      }
     }
   
   def track_events(self):
@@ -140,6 +147,13 @@ class DiscordAnalytics():
           "guildsStats": [],
           "addedGuilds": 0,
           "removedGuilds": 0,
+          "users_type": {
+            "admin": 0,
+            "moderator": 0,
+            "new_member": 0,
+            "other": 0,
+            "private_message": 0
+          }
         }
       
       await asyncio.sleep(10 if "--dev" in sys.argv else 300)
@@ -169,19 +183,6 @@ class DiscordAnalytics():
       print("[DISCORDANALYTICS] Track interactions triggered")
     if not self.is_ready:
       raise ValueError(ErrorCodes.INSTANCE_NOT_INITIALIZED)
-    
-    guilds = []
-    for guild in self.client.guilds:
-      if guild.preferred_locale is not None:
-        guild_locale = next((x for x in guilds if x["locale"] == guild.preferred_locale.value), None)
-        if guild_locale is not None:
-          guild_locale["number"] += 1
-        else:
-          guilds.append({
-            "locale": guild.preferred_locale.value,
-            "number": 1
-          })
-    self.stats["guildsLocales"] = guilds
     
     locale = next((x for x in self.stats["locales"] if x["locale"] == interaction.locale.value), None)
     if locale is not None:
@@ -213,17 +214,43 @@ class DiscordAnalytics():
           "type": interaction.type.value
         })
 
-    guild_data = next((x for x in self.stats["guildsStats"] if x["guildId"] == str(interaction.guild.id)), None)
-    if guild_data is not None:
-      guild_data["interactions"] += 1
+    if interaction.guild is None:
+      self.stats["users_type"]["private_message"] += 1
     else:
-      self.stats["guildsStats"].append({
-        "guildId": str(interaction.guild.id),
-        "name": interaction.guild.name,
-        "icon": interaction.guild.icon,
-        "members": interaction.guild.member_count,
-        "interactions": 1
-      })
+      guilds = []
+      for guild in self.client.guilds:
+        if guild.preferred_locale is not None:
+          guild_locale = next((x for x in guilds if x["locale"] == guild.preferred_locale.value), None)
+          if guild_locale is not None:
+            guild_locale["number"] += 1
+          else:
+            guilds.append({
+              "locale": guild.preferred_locale.value,
+              "number": 1
+            })
+      self.stats["guildsLocales"] = guilds
+
+      guild_data = next((x for x in self.stats["guildsStats"] if x["guildId"] == str(interaction.guild.id)), None)
+      if guild_data is not None:
+        guild_data["interactions"] += 1
+      else:
+        self.stats["guildsStats"].append({
+          "guildId": str(interaction.guild.id),
+          "name": interaction.guild.name,
+          "icon": interaction.guild.icon.key,
+          "members": interaction.guild.member_count,
+          "interactions": 1
+        })
+      
+      if interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild:
+        self.stats["users_type"]["admin"] += 1
+      elif interaction.user.guild_permissions.manage_messages or interaction.user.guild_permissions.kick_members or interaction.user.guild_permissions.ban_members or interaction.user.guild_permissions.mute_members or interaction.user.guild_permissions.deafen_members or interaction.user.guild_permissions.move_members or interaction.user.guild_permissions.moderate_members:
+        self.stats["users_type"]["moderator"] += 1
+        # check if the member is less than 7 days old
+      elif interaction.user.joined_at is not None and (datetime.now() - interaction.user.joined_at).days <= 7:
+        self.stats["users_type"]["new_member"] += 1
+      else:
+        self.stats["users_type"]["other"] += 1
 
   # type = delete or create
   def trackGuilds(self, guild: discord.Guild, type: Literal["create", "delete"]):

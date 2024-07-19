@@ -1,4 +1,4 @@
-discord.py==2.3.2
-requests==2.31.0
-setuptools==68.0.0
+discord.py==2.4.0
+requests==2.32.3
+setuptools==71.0.3
 wheel==0.43.0

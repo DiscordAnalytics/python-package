@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "discordanalytics"
 description = "A Python package for interacting with Discord Analytics API"
-version = "0.0.5"
+version = "3.0.0"
 authors = [
   {name = "ValDesign", email = "valdesign.dev@gmail.com"}
 ]
