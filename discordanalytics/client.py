@@ -244,9 +244,16 @@ class DiscordAnalytics():
       
       if interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild:
         self.stats["users_type"]["admin"] += 1
-      elif interaction.user.guild_permissions.manage_messages or interaction.user.guild_permissions.kick_members or interaction.user.guild_permissions.ban_members or interaction.user.guild_permissions.mute_members or interaction.user.guild_permissions.deafen_members or interaction.user.guild_permissions.move_members or interaction.user.guild_permissions.moderate_members:
+      elif (
+          interaction.user.guild_permissions.manage_messages
+          or interaction.user.guild_permissions.kick_members
+          or interaction.user.guild_permissions.ban_members
+          or interaction.user.guild_permissions.mute_members
+          or interaction.user.guild_permissions.deafen_members
+          or interaction.user.guild_permissions.move_members
+          or interaction.user.guild_permissions.moderate_members
+        ):
         self.stats["users_type"]["moderator"] += 1
-        # check if the member is less than 7 days old
       elif interaction.user.joined_at is not None and (datetime.now() - interaction.user.joined_at).days <= 7:
         self.stats["users_type"]["new_member"] += 1
       else:
