@@ -268,5 +268,3 @@ class DiscordAnalytics():
       self.stats["addedGuilds"] += 1
     elif type == "delete":
       self.stats["removedGuilds"] += 1
-    else:
-      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
