@@ -231,13 +231,15 @@ class DiscordAnalytics():
       self.stats["guildsLocales"] = guilds
 
       guild_data = next((x for x in self.stats["guildsStats"] if x["guildId"] == str(interaction.guild.id)), None)
+      guild_icon = interaction.guild.icon.key if interaction.guild.icon else None
       if guild_data is not None:
         guild_data["interactions"] += 1
+        guild_data["icon"] = guild_icon
       else:
         self.stats["guildsStats"].append({
           "guildId": str(interaction.guild.id),
           "name": interaction.guild.name,
-          "icon": interaction.guild.icon.key,
+          "icon": guild_icon,
           "members": interaction.guild.member_count,
           "interactions": 1
         })
