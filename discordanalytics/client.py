@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 import discord
 from discord.enums import InteractionType
@@ -256,7 +256,7 @@ class DiscordAnalytics():
           or interaction.user.guild_permissions.moderate_members
         ):
         self.stats["users_type"]["moderator"] += 1
-      elif interaction.user.joined_at is not None and (datetime.now() - interaction.user.joined_at).days <= 7:
+      elif interaction.user.joined_at is not None and (discord.utils.utcnow() - interaction.user.joined_at).days <= 7:
         self.stats["users_type"]["new_member"] += 1
       else:
         self.stats["users_type"]["other"] += 1
