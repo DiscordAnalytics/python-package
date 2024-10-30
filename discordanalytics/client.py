@@ -185,8 +185,7 @@ class DiscordAnalytics():
               }
             }
 
-      # await asyncio.sleep(10 if "--dev" in sys.argv else 300)
-      await asyncio.sleep(10)
+      await asyncio.sleep(10 if "--dev" in sys.argv else 300)
 
   def calculate_guild_members_repartition(self):
     result = {
