@@ -163,28 +163,29 @@ class DiscordAnalytics():
           elif response.status != 200:
             raise ValueError(ErrorCodes.INVALID_RESPONSE)
 
-          if response.status == 200 and self.debug:
-            print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
+          if response.status == 200:
+            if self.debug:
+              print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
 
-      self.stats = {
-        "date": datetime.today().strftime("%Y-%m-%d"),
-        "guilds": guild_count,
-        "users": user_count,
-        "interactions": [],
-        "locales": [],
-        "guildsLocales": [],
-        "guildMembers": self.calculate_guild_members_repartition(),
-        "guildsStats": [],
-        "addedGuilds": 0,
-        "removedGuilds": 0,
-        "users_type": {
-          "admin": 0,
-          "moderator": 0,
-          "new_member": 0,
-          "other": 0,
-          "private_message": 0
-        }
-      }
+            self.stats = {
+              "date": datetime.today().strftime("%Y-%m-%d"),
+              "guilds": guild_count,
+              "users": user_count,
+              "interactions": [],
+              "locales": [],
+              "guildsLocales": [],
+              "guildMembers": self.calculate_guild_members_repartition(),
+              "guildsStats": [],
+              "addedGuilds": 0,
+              "removedGuilds": 0,
+              "users_type": {
+                "admin": 0,
+                "moderator": 0,
+                "new_member": 0,
+                "other": 0,
+                "private_message": 0
+              }
+            }
 
       await asyncio.sleep(10 if "--dev" in sys.argv else 300)
 
