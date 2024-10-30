@@ -24,11 +24,12 @@ class ErrorCodes:
   INVALID_EVENTS_COUNT = "invalid events count"
 
 class DiscordAnalytics():
-  def __init__(self, client: discord.Client, api_key: str, debug: bool = False):
+  def __init__(self, client: discord.Client, api_key: str, debug: bool = False, chunk_guilds_at_startup: bool = True):
     self.client = client
     self.api_key = api_key
     self.debug = debug
     self.is_ready = False
+    self.chunk_guilds = chunk_guilds_at_startup
     self.headers = {
       "Content-Type": "application/json",
       "Authorization": f"Bot {api_key}"
@@ -57,30 +58,33 @@ class DiscordAnalytics():
         "private_message": 0
       }
     }
-  
+
   def track_events(self):
     if not self.client.is_ready():
       @self.client.event
       async def on_ready():
         self.init()
     else:
-      self.init()
+        self.init()
+
     @self.client.event
     async def on_interaction(interaction: discord.Interaction):
       self.track_interactions(interaction)
+
     @self.client.event
     async def on_guild_join(guild: discord.Guild):
       self.trackGuilds(guild, "create")
+
     @self.client.event
     async def on_guild_remove(guild: discord.Guild):
       self.trackGuilds(guild, "delete")
-  
-  def init(self):
+
+  async def init(self):
     if not isinstance(self.client, discord.Client):
       raise ValueError(ErrorCodes.INVALID_CLIENT_TYPE)
     if not self.client.is_ready():
       raise ValueError(ErrorCodes.CLIENT_NOT_READY)
-    
+
     response = requests.patch(
       ApiEndpoints.BOT_URL.replace(":id", str(self.client.user.id)),
       headers=self.headers,
@@ -98,7 +102,7 @@ class DiscordAnalytics():
       raise ValueError(ErrorCodes.SUSPENDED_BOT)
     if response.status_code != 200:
       raise ValueError(ErrorCodes.INVALID_RESPONSE)
-    
+
     if self.debug:
       print("[DISCORDANALYTICS] Instance successfully initialized")
     self.is_ready = True
@@ -109,14 +113,40 @@ class DiscordAnalytics():
       else:
         print("[DISCORDANALYTICS] DevMode is disabled. Stats will be sent every 5 minutes.")
 
+    if not self.chunk_guilds:
+      await self.load_members_for_all_guilds()
+
     self.client.loop.create_task(self.send_stats())
+
+  async def load_members_for_all_guilds(self):
+    """Load members for each guild when chunk_guilds_at_startup is False."""
+    tasks = [self.load_members_for_guild(guild) for guild in self.client.guilds]
+    await asyncio.gather(*tasks)
+
+  async def load_members_for_guild(self, guild: discord.Guild):
+    """Load members for a single guild."""
+    try:
+      await guild.chunk()
+      if self.debug:
+        print(f"[DISCORDANALYTICS] Chunked members for guild {guild.name}")
+    except Exception:
+      await self.query_members(guild)
+
+  async def query_members(self, guild: discord.Guild):
+    """Query members by prefix if chunking fails."""
+    try:
+      members = await guild.query_members(query="", limit=1000)
+      if self.debug:
+        print(f"[DISCORDANALYTICS] Queried members for guild {guild.name}: {len(members)} members found.")
+    except Exception as e:
+      print(f"[DISCORDANALYTICS] Error querying members for guild {guild.name}: {e}")
 
   async def send_stats(self):
     await self.client.wait_until_ready()
     while not self.client.is_closed():
       if self.debug:
-        print("[DISCORDANALYTICS] Sending stats...")
-      
+          print("[DISCORDANALYTICS] Sending stats...")
+
       guild_count = len(self.client.guilds)
       user_count = len(self.client.users)
 
@@ -135,7 +165,7 @@ class DiscordAnalytics():
       if response.status_code == 200:
         if self.debug:
           print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
-        
+
         self.stats = {
           "date": datetime.today().strftime("%Y-%m-%d"),
           "guilds": guild_count,
@@ -155,7 +185,7 @@ class DiscordAnalytics():
             "private_message": 0
           }
         }
-      
+
       await asyncio.sleep(10 if "--dev" in sys.argv else 300)
 
   def calculate_guild_members_repartition(self):
@@ -177,13 +207,13 @@ class DiscordAnalytics():
         result["huge"] += 1
 
     return result
-  
+
   def track_interactions(self, interaction: discord.Interaction):
     if self.debug:
       print("[DISCORDANALYTICS] Track interactions triggered")
     if not self.is_ready:
       raise ValueError(ErrorCodes.INSTANCE_NOT_INITIALIZED)
-    
+
     locale = next((x for x in self.stats["locales"] if x["locale"] == interaction.locale.value), None)
     if locale is not None:
       locale["number"] += 1
@@ -243,7 +273,7 @@ class DiscordAnalytics():
           "members": interaction.guild.member_count,
           "interactions": 1
         })
-      
+
       if interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild:
         self.stats["users_type"]["admin"] += 1
       elif (
@@ -261,7 +291,6 @@ class DiscordAnalytics():
       else:
         self.stats["users_type"]["other"] += 1
 
-  # type = delete or create
   def trackGuilds(self, guild: discord.Guild, type: Literal["create", "delete"]):
     if self.debug:
       print(f"[DISCORDANALYTICS] trackGuilds({type}) triggered")
