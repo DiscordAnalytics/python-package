@@ -91,7 +91,7 @@ class DiscordAnalytics():
         headers=self.headers,
         json={
           "username": self.client.user.name,
-          "avatar": str(self.client.user.display_avatar.url),
+          "avatar": self.client.user._avatar,
           "framework": "discord.py",
           "version": __version__
         }
