@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Literal
 import discord
 from discord.enums import InteractionType
@@ -20,7 +20,6 @@ class ErrorCodes:
   INVALID_API_TOKEN = "Invalid API token, please get one at " + ApiEndpoints.BASE_URL.split("/api")[0] + " and try again."
   DATA_NOT_SENT = "Data cannot be sent to the API, I will try again in a minute."
   SUSPENDED_BOT = "Your bot has been suspended, please check your mailbox for more information."
-  INSTANCE_NOT_INITIALIZED = "It seem that you didn't initialize your instance. Please check the docs for more informations."
   INVALID_EVENTS_COUNT = "invalid events count"
 
 class DiscordAnalytics():
@@ -28,7 +27,6 @@ class DiscordAnalytics():
     self.client = client
     self.api_key = api_key
     self.debug = debug
-    self.is_ready = False
     self.chunk_guilds = chunk_guilds_at_startup
     self.headers = {
       "Content-Type": "application/json",
@@ -85,6 +83,7 @@ class DiscordAnalytics():
     if not self.client.is_ready():
       raise ValueError(ErrorCodes.CLIENT_NOT_READY)
 
+    # Proceed with initialization, API calls, etc.
     async with aiohttp.ClientSession() as session:
       async with session.patch(
         ApiEndpoints.BOT_URL.replace(":id", str(self.client.user.id)),
@@ -105,7 +104,6 @@ class DiscordAnalytics():
 
     if self.debug:
       print("[DISCORDANALYTICS] Instance successfully initialized")
-      self.is_ready = True
 
     if self.debug:
       if "--dev" in sys.argv:
@@ -187,7 +185,8 @@ class DiscordAnalytics():
               }
             }
 
-      await asyncio.sleep(10 if "--dev" in sys.argv else 300)
+      # await asyncio.sleep(10 if "--dev" in sys.argv else 300)
+      await asyncio.sleep(10)
 
   def calculate_guild_members_repartition(self):
     result = {
@@ -212,8 +211,9 @@ class DiscordAnalytics():
   def track_interactions(self, interaction: discord.Interaction):
     if self.debug:
       print("[DISCORDANALYTICS] Track interactions triggered")
-    if not self.is_ready:
-      raise ValueError(ErrorCodes.INSTANCE_NOT_INITIALIZED)
+
+    if not self.client.is_ready():
+      raise ValueError(ErrorCodes.CLIENT_NOT_READY)
 
     locale = next((x for x in self.stats["locales"] if x["locale"] == interaction.locale.value), None)
     if locale is not None:
