@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Literal
 import discord
 from discord.enums import InteractionType
-import requests
+import aiohttp
 import sys
 
 from .__init__ import __version__
@@ -63,9 +63,9 @@ class DiscordAnalytics():
     if not self.client.is_ready():
       @self.client.event
       async def on_ready():
-        self.init()
+        await self.init()
     else:
-        self.init()
+      asyncio.create_task(self.init())
 
     @self.client.event
     async def on_interaction(interaction: discord.Interaction):
@@ -85,27 +85,27 @@ class DiscordAnalytics():
     if not self.client.is_ready():
       raise ValueError(ErrorCodes.CLIENT_NOT_READY)
 
-    response = requests.patch(
-      ApiEndpoints.BOT_URL.replace(":id", str(self.client.user.id)),
-      headers=self.headers,
-      json={
-        "username": self.client.user.name,
-        "avatar": self.client.user._avatar,
-        "framework": "discord.py",
-        "version": __version__
-      }
-    )
-
-    if response.status_code == 401:
-      raise ValueError(ErrorCodes.INVALID_API_TOKEN)
-    if response.status_code == 423:
-      raise ValueError(ErrorCodes.SUSPENDED_BOT)
-    if response.status_code != 200:
-      raise ValueError(ErrorCodes.INVALID_RESPONSE)
+    async with aiohttp.ClientSession() as session:
+      async with session.patch(
+        ApiEndpoints.BOT_URL.replace(":id", str(self.client.user.id)),
+        headers=self.headers,
+        json={
+          "username": self.client.user.name,
+          "avatar": self.client.user.display_avatar,
+          "framework": "discord.py",
+          "version": __version__
+        }
+      ) as response:
+        if response.status == 401:
+          raise ValueError(ErrorCodes.INVALID_API_TOKEN)
+        elif response.status == 423:
+          raise ValueError(ErrorCodes.SUSPENDED_BOT)
+        elif response.status != 200:
+          raise ValueError(ErrorCodes.INVALID_RESPONSE)
 
     if self.debug:
       print("[DISCORDANALYTICS] Instance successfully initialized")
-    self.is_ready = True
+      self.is_ready = True
 
     if self.debug:
       if "--dev" in sys.argv:
@@ -145,46 +145,46 @@ class DiscordAnalytics():
     await self.client.wait_until_ready()
     while not self.client.is_closed():
       if self.debug:
-          print("[DISCORDANALYTICS] Sending stats...")
+        print("[DISCORDANALYTICS] Sending stats...")
 
       guild_count = len(self.client.guilds)
       user_count = len(self.client.users)
 
-      response = requests.post(
-        ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id)),
-        headers=self.headers,
-        json=self.stats
-      )
+      async with aiohttp.ClientSession() as session:
+        async with session.post(
+          ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id)),
+          headers=self.headers,
+          json=self.stats
+        ) as response:
+          if response.status == 401:
+            raise ValueError(ErrorCodes.INVALID_API_TOKEN)
+          elif response.status == 423:
+            raise ValueError(ErrorCodes.SUSPENDED_BOT)
+          elif response.status != 200:
+            raise ValueError(ErrorCodes.INVALID_RESPONSE)
 
-      if response.status_code == 401:
-        raise ValueError(ErrorCodes.INVALID_API_TOKEN)
-      if response.status_code == 423:
-        raise ValueError(ErrorCodes.SUSPENDED_BOT)
-      if response.status_code != 200:
-        raise ValueError(ErrorCodes.INVALID_RESPONSE)
-      if response.status_code == 200:
-        if self.debug:
-          print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
+          if response.status == 200 and self.debug:
+            print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
 
-        self.stats = {
-          "date": datetime.today().strftime("%Y-%m-%d"),
-          "guilds": guild_count,
-          "users": user_count,
-          "interactions": [],
-          "locales": [],
-          "guildsLocales": [],
-          "guildMembers": self.calculate_guild_members_repartition(),
-          "guildsStats": [],
-          "addedGuilds": 0,
-          "removedGuilds": 0,
-          "users_type": {
-            "admin": 0,
-            "moderator": 0,
-            "new_member": 0,
-            "other": 0,
-            "private_message": 0
-          }
+      self.stats = {
+        "date": datetime.today().strftime("%Y-%m-%d"),
+        "guilds": guild_count,
+        "users": user_count,
+        "interactions": [],
+        "locales": [],
+        "guildsLocales": [],
+        "guildMembers": self.calculate_guild_members_repartition(),
+        "guildsStats": [],
+        "addedGuilds": 0,
+        "removedGuilds": 0,
+        "users_type": {
+          "admin": 0,
+          "moderator": 0,
+          "new_member": 0,
+          "other": 0,
+          "private_message": 0
         }
+      }
 
       await asyncio.sleep(10 if "--dev" in sys.argv else 300)
 
@@ -223,8 +223,9 @@ class DiscordAnalytics():
         "number": 1
       })
 
-    if interaction.type == InteractionType.application_command or interaction.type == InteractionType.autocomplete:
-      interaction_data = next((x for x in self.stats["interactions"] if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value), None)
+    if interaction.type in {InteractionType.application_command, InteractionType.autocomplete}:
+      interaction_data = next((x for x in self.stats["interactions"]
+      if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value), None)
       if interaction_data is not None:
         interaction_data["number"] += 1
       else:
@@ -233,8 +234,9 @@ class DiscordAnalytics():
           "number": 1,
           "type": interaction.type.value
         })
-    elif interaction.type == InteractionType.component or interaction.type == InteractionType.modal_submit:
-      interaction_data = next((x for x in self.stats["interactions"] if x["name"] == interaction.data["custom_id"] and x["type"] == interaction.type.value), None)
+    elif interaction.type in {InteractionType.component, InteractionType.modal_submit}:
+      interaction_data = next((x for x in self.stats["interactions"]
+      if x["name"] == interaction.data["custom_id"] and x["type"] == interaction.type.value), None)
       if interaction_data is not None:
         interaction_data["number"] += 1
       else:
@@ -249,9 +251,9 @@ class DiscordAnalytics():
     else:
       guilds = []
       for guild in self.client.guilds:
-        if guild.preferred_locale is not None:
+        if guild.preferred_locale:
           guild_locale = next((x for x in guilds if x["locale"] == guild.preferred_locale.value), None)
-          if guild_locale is not None:
+          if guild_locale:
             guild_locale["number"] += 1
           else:
             guilds.append({
@@ -262,7 +264,7 @@ class DiscordAnalytics():
 
       guild_data = next((x for x in self.stats["guildsStats"] if x["guildId"] == str(interaction.guild.id)), None)
       guild_icon = interaction.guild.icon.key if interaction.guild.icon else None
-      if guild_data is not None:
+      if guild_data:
         guild_data["interactions"] += 1
         guild_data["icon"] = guild_icon
       else:
@@ -276,17 +278,16 @@ class DiscordAnalytics():
 
       if interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild:
         self.stats["users_type"]["admin"] += 1
-      elif (
-          interaction.user.guild_permissions.manage_messages
-          or interaction.user.guild_permissions.kick_members
-          or interaction.user.guild_permissions.ban_members
-          or interaction.user.guild_permissions.mute_members
-          or interaction.user.guild_permissions.deafen_members
-          or interaction.user.guild_permissions.move_members
-          or interaction.user.guild_permissions.moderate_members
-        ):
+      elif any(perm for perm in [
+          interaction.user.guild_permissions.manage_messages,
+          interaction.user.guild_permissions.kick_members,
+          interaction.user.guild_permissions.ban_members,
+          interaction.user.guild_permissions.mute_members,
+          interaction.user.guild_permissions.deafen_members,
+          interaction.user.guild_permissions.move_members,
+          interaction.user.guild_permissions.moderate_members]):
         self.stats["users_type"]["moderator"] += 1
-      elif interaction.user.joined_at is not None and (discord.utils.utcnow() - interaction.user.joined_at).days <= 7:
+      elif interaction.user.joined_at and (discord.utils.utcnow() - interaction.user.joined_at).days <= 7:
         self.stats["users_type"]["new_member"] += 1
       else:
         self.stats["users_type"]["other"] += 1
