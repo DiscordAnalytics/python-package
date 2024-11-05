@@ -9,7 +9,7 @@ import sys
 from .__init__ import __version__
 
 class ApiEndpoints:
-  BASE_URL = "https://discordanalytics.xyz/api"
+  BASE_URL = "http://localhost:3000/api"
   BOT_URL = f"{BASE_URL}/bots/:id"
   STATS_URL = f"{BASE_URL}/bots/:id/stats"
 
@@ -92,7 +92,8 @@ class DiscordAnalytics():
           "username": self.client.user.name,
           "avatar": self.client.user._avatar,
           "framework": "discord.py",
-          "version": __version__
+          "version": __version__,
+          "team": [str(member.id) for member in self.client.application.team.members] if self.client.application.team else []
         }
       ) as response:
         if response.status == 401:
