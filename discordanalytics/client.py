@@ -93,6 +93,8 @@ class DiscordAnalytics():
               raise ValueError(ErrorCodes.INVALID_RESPONSE)
       except (aiohttp.ClientError, ValueError) as e:
         retries += 1
+        if self.debug:
+          print(f"[DISCORDANALYTICS] Error: {e}. Retrying in {backoff_factor * (2 ** retries)} seconds...")
         if retries >= max_retries:
           raise e
         await asyncio.sleep(backoff_factor * (2 ** retries))
