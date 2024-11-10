@@ -9,7 +9,7 @@ import sys
 from .__init__ import __version__
 
 class ApiEndpoints:
-  BASE_URL = "http://localhost:3000/api"
+  BASE_URL = "https://discordanalytics.xyz/api"
   BOT_URL = f"{BASE_URL}/bots/:id"
   STATS_URL = f"{BASE_URL}/bots/:id/stats"
 
