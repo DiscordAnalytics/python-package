@@ -9,7 +9,7 @@ import sys
 from .__init__ import __version__
 
 class ApiEndpoints:
-  BASE_URL = "http://localhost:3000/api"
+  BASE_URL = "https://discordanalytics.xyz/api"
   BOT_URL = f"{BASE_URL}/bots/:id"
   STATS_URL = f"{BASE_URL}/bots/:id/stats"
 
@@ -77,31 +77,43 @@ class DiscordAnalytics():
     async def on_guild_remove(guild: discord.Guild):
       self.trackGuilds(guild, "delete")
 
+  async def api_call_with_retries(self, method, url, headers, json, max_retries=5, backoff_factor=0.5):
+    retries = 0
+    while retries < max_retries:
+      try:
+        async with aiohttp.ClientSession() as session:
+          async with session.request(method, url, headers=headers, json=json) as response:
+            if response.status == 200:
+              return response
+            elif response.status == 401:
+              raise ValueError(ErrorCodes.INVALID_API_TOKEN)
+            elif response.status == 423:
+              raise ValueError(ErrorCodes.SUSPENDED_BOT)
+            else:
+              raise ValueError(ErrorCodes.INVALID_RESPONSE)
+      except (aiohttp.ClientError, ValueError) as e:
+        retries += 1
+        if retries >= max_retries:
+          raise e
+        await asyncio.sleep(backoff_factor * (2 ** retries))
+
   async def init(self):
     if not isinstance(self.client, discord.Client):
       raise ValueError(ErrorCodes.INVALID_CLIENT_TYPE)
     if not self.client.is_ready():
       raise ValueError(ErrorCodes.CLIENT_NOT_READY)
 
-    # Proceed with initialization, API calls, etc.
-    async with aiohttp.ClientSession() as session:
-      async with session.patch(
-        ApiEndpoints.BOT_URL.replace(":id", str(self.client.user.id)),
-        headers=self.headers,
-        json={
-          "username": self.client.user.name,
-          "avatar": self.client.user._avatar,
-          "framework": "discord.py",
-          "version": __version__,
-          "team": [str(member.id) for member in self.client.application.team.members] if self.client.application.team else []
-        }
-      ) as response:
-        if response.status == 401:
-          raise ValueError(ErrorCodes.INVALID_API_TOKEN)
-        elif response.status == 423:
-          raise ValueError(ErrorCodes.SUSPENDED_BOT)
-        elif response.status != 200:
-          raise ValueError(ErrorCodes.INVALID_RESPONSE)
+    url = ApiEndpoints.BOT_URL.replace(":id", str(self.client.user.id))
+    headers = self.headers
+    json = {
+      "username": self.client.user.name,
+      "avatar": self.client.user._avatar,
+      "framework": "discord.py",
+      "version": __version__,
+      "team": [str(member.id) for member in self.client.application.team.members] if self.client.application.team else []
+    }
+
+    await self.api_call_with_retries("PATCH", url, headers, json)
 
     if self.debug:
       print("[DISCORDANALYTICS] Instance successfully initialized")
@@ -149,42 +161,38 @@ class DiscordAnalytics():
       guild_count = len(self.client.guilds)
       user_count = len(self.client.users)
 
-      async with aiohttp.ClientSession() as session:
-        async with session.post(
-          ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id)),
-          headers=self.headers,
-          json=self.stats
-        ) as response:
-          if response.status == 401:
-            raise ValueError(ErrorCodes.INVALID_API_TOKEN)
-          elif response.status == 423:
-            raise ValueError(ErrorCodes.SUSPENDED_BOT)
-          elif response.status != 200:
-            raise ValueError(ErrorCodes.INVALID_RESPONSE)
+      url = ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id))
+      headers = self.headers
+      json = self.stats
 
-          if response.status == 200:
-            if self.debug:
-              print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
+      await self.api_call_with_retries("POST", url, headers, json)
 
-            self.stats = {
-              "date": datetime.today().strftime("%Y-%m-%d"),
-              "guilds": guild_count,
-              "users": user_count,
-              "interactions": [],
-              "locales": [],
-              "guildsLocales": [],
-              "guildMembers": self.calculate_guild_members_repartition(),
-              "guildsStats": [],
-              "addedGuilds": 0,
-              "removedGuilds": 0,
-              "users_type": {
-                "admin": 0,
-                "moderator": 0,
-                "new_member": 0,
-                "other": 0,
-                "private_message": 0
-              }
-            }
+      if self.debug:
+        print(f"[DISCORDANALYTICS] Stats {self.stats} sent to the API")
+      self.stats = {
+        "date": datetime.today().strftime("%Y-%m-%d"),
+        "guilds": guild_count,
+        "users": user_count,
+        "interactions": [],
+        "locales": [],
+        "guildsLocales": [],
+        "guildMembers": {
+          "little": 0,
+          "medium": 0,
+          "big": 0,
+          "huge": 0
+        },
+        "guildsStats": [],
+        "addedGuilds": 0,
+        "removedGuilds": 0,
+        "users_type": {
+          "admin": 0,
+          "moderator": 0,
+          "new_member": 0,
+          "other": 0,
+          "private_message": 0
+        }
+      }
 
       await asyncio.sleep(10 if "--dev" in sys.argv else 300)
 
