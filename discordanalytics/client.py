@@ -36,7 +36,7 @@ class DiscordAnalytics():
       "date": datetime.today().strftime("%Y-%m-%d"),
       "guilds": 0,
       "users": 0,
-      "interactions": [], # {name:str, number:int, type:int}[]
+      "interactions": [], # {name:str, number:int, type:int command_type?:int}[]
       "locales": [], # {locale:str, number:int}[]
       "guildsLocales": [], # {locale:str, number:int}[]
       "guildMembers": {
@@ -236,14 +236,15 @@ class DiscordAnalytics():
 
     if interaction.type in {InteractionType.application_command, InteractionType.autocomplete}:
       interaction_data = next((x for x in self.stats["interactions"]
-      if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value), None)
+      if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value and x["command_type"] == interaction.data["type"]), None)
       if interaction_data is not None:
         interaction_data["number"] += 1
       else:
         self.stats["interactions"].append({
           "name": interaction.data["name"],
           "number": 1,
-          "type": interaction.type.value
+          "type": interaction.type.value,
+          "command_type": interaction.data["type"]
         })
     elif interaction.type in {InteractionType.component, InteractionType.modal_submit}:
       interaction_data = next((x for x in self.stats["interactions"]
