@@ -235,8 +235,8 @@ class DiscordAnalytics():
       })
 
     if interaction.type in {InteractionType.application_command, InteractionType.autocomplete}:
-      interaction_data = next((x for x in self.stats["interactions"]
-      if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value and x["command_type"] == interaction.data["type"]), None)
+      interaction_data = next((x for x in self.stats["interactions"] 
+      if x["name"] == interaction.data["name"] and x["type"] == interaction.type.value and x["command_type"] == (interaction.data["type"] or 1)), None)
       if interaction_data is not None:
         interaction_data["number"] += 1
       else:
