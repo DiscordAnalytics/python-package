@@ -224,6 +224,9 @@ class DiscordAnalytics():
 
     if not self.client.is_ready():
       raise ValueError(ErrorCodes.CLIENT_NOT_READY)
+    
+    if interaction.type == InteractionType.autocomplete:
+      return
 
     locale = next((x for x in self.stats["locales"] if x["locale"] == interaction.locale.value), None)
     if locale is not None:
