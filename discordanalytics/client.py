@@ -220,7 +220,8 @@ class DiscordAnalytics():
           "new_member": 0,
           "other": 0,
           "private_message": 0
-        }
+        },
+        "custom_events": {},
       }
 
       await asyncio.sleep(30 if "--dev" in sys.argv else 300)
