@@ -22,6 +22,32 @@ class ErrorCodes:
   SUSPENDED_BOT = "Your bot has been suspended, please check your mailbox for more information."
   INVALID_EVENTS_COUNT = "invalid events count"
 
+class Event:
+  def __init__(self, analytics, event_key: str):
+    self.analytics = analytics
+    self.event_key = event_key
+
+  def increment(self, count: int = 1):
+    if self.analytics.debug:
+      print(f"[DISCORDANALYTICS] Incrementing event {self.event_key} by {count}")
+    if not isinstance(count, int) or count < 0:
+      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+    self.analytics.stats["custom_events"][self.event_key] += count
+
+  def decrement(self, count: int = 1):
+    if self.analytics.debug:
+      print(f"[DISCORDANALYTICS] Decrementing event {self.event_key} by {count}")
+    if not isinstance(count, int) or count < 0:
+      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+    self.analytics.stats["custom_events"][self.event_key] -= count
+
+  def set(self, value: int):
+    if self.analytics.debug:
+      print(f"[DISCORDANALYTICS] Setting event {self.event_key} to {value}")
+    if not isinstance(value, int) or value < 0:
+      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+    self.analytics.stats["custom_events"][self.event_key] = value
+
 class DiscordAnalytics():
   def __init__(self, client: discord.Client, api_key: str, debug: bool = False, chunk_guilds_at_startup: bool = True):
     self.client = client
@@ -54,7 +80,8 @@ class DiscordAnalytics():
         "new_member": 0,
         "other": 0,
         "private_message": 0
-      }
+      },
+      "custom_events": {}, # {[event_key:str]: int}
     }
 
   def track_events(self):
@@ -315,3 +342,12 @@ class DiscordAnalytics():
       self.stats["addedGuilds"] += 1
     elif type == "delete":
       self.stats["removedGuilds"] += 1
+
+  def events(self, event_key: str):
+    if self.debug:
+      print(f"[DISCORDANALYTICS] Event {event_key} triggered")
+    if not self.client.is_ready():
+      raise ValueError(ErrorCodes.CLIENT_NOT_READY)
+    if event_key not in self.stats["custom_events"]:
+      self.stats["custom_events"][event_key] = 0
+    return Event(self, event_key)
