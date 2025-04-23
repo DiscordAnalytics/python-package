@@ -21,6 +21,7 @@ class ErrorCodes:
   DATA_NOT_SENT = "Data cannot be sent to the API, I will try again in a minute."
   SUSPENDED_BOT = "Your bot has been suspended, please check your mailbox for more information."
   INVALID_EVENTS_COUNT = "invalid events count"
+  INVALID_VALUE_TYPE = "invalid value type"
 
 class Event:
   def __init__(self, analytics, event_key: str):
@@ -31,21 +32,21 @@ class Event:
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Incrementing event {self.event_key} by {count}")
     if not isinstance(count, int) or count < 0:
-      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+      raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
     self.analytics.stats["custom_events"][self.event_key] += count
 
   def decrement(self, count: int = 1):
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Decrementing event {self.event_key} by {count}")
     if not isinstance(count, int) or count < 0:
-      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+      raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
     self.analytics.stats["custom_events"][self.event_key] -= count
 
   def set(self, value: int):
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Setting event {self.event_key} to {value}")
     if not isinstance(value, int) or value < 0:
-      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+      raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
     self.analytics.stats["custom_events"][self.event_key] = value
 
 class DiscordAnalytics():
