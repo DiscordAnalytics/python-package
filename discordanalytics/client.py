@@ -13,6 +13,7 @@ class ApiEndpoints:
   BASE_URL = "https://discordanalytics.xyz/api"
   BOT_URL = f"{BASE_URL}/bots/:id"
   STATS_URL = f"{BASE_URL}/bots/:id/stats"
+  EVENT_URL = f"{BASE_URL}/bots/:id/events/:event_key"
 
 class ErrorCodes:
   INVALID_CLIENT_TYPE = "Invalid client type, please use a valid client."
@@ -23,19 +24,31 @@ class ErrorCodes:
   SUSPENDED_BOT = "Your bot has been suspended, please check your mailbox for more information."
   INVALID_EVENTS_COUNT = "invalid events count"
   INVALID_VALUE_TYPE = "invalid value type"
+  INVALID_EVENT_KEY = "invalid event key"
 
 class Event:
   def __init__(self, analytics, event_key: str):
     self.analytics = analytics
     self.event_key = event_key
 
+    self.ensure()
+
   def ensure(self):
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Ensuring event {self.event_key} exists")
     if not isinstance(self.event_key, str) or len(self.event_key) < 1 or len(self.event_key) > 50:
       raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+    
+    url = ApiEndpoints.EVENT_URL.replace(":id", str(self.analytics.client.user.id)).replace(":event_key", self.event_key)
+    body = { "event": self.event_key, "count": 0 }
+
+    self.analytics.api_call_with_retries("POST", url, self.analytics.headers, body)
+    
     if self.event_key not in self.analytics.stats["custom_events"]:
       self.analytics.stats["custom_events"][self.event_key] = 0
+
+    if self.analytics.debug:
+      print(f"[DISCORDANALYTICS] Event {self.event_key} ensured")
 
   def increment(self, count: int = 1):
     if self.analytics.debug:
@@ -60,6 +73,14 @@ class Event:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
     self.ensure()
     self.analytics.stats["custom_events"][self.event_key] = value
+
+  def get(self):
+    if self.analytics.debug:
+      print(f"[DISCORDANALYTICS] Getting event {self.event_key}")
+    if not isinstance(self.event_key, str) or len(self.event_key) < 1 or len(self.event_key) > 50:
+      raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
+    self.ensure()
+    return self.analytics.stats["custom_events"][self.event_key]
 
 class DiscordAnalytics():
   def __init__(self, client: discord.Client, api_key: str, debug: bool = False, chunk_guilds_at_startup: bool = True):
@@ -129,6 +150,8 @@ class DiscordAnalytics():
               raise ValueError(ErrorCodes.INVALID_API_TOKEN)
             elif response.status == 423:
               raise ValueError(ErrorCodes.SUSPENDED_BOT)
+            elif response.status == 404 and "events" in url:
+              raise ValueError(ErrorCodes.INVALID_EVENT_KEY)
             else:
               raise ValueError(ErrorCodes.INVALID_RESPONSE)
       except (aiohttp.ClientError, ValueError) as e:
