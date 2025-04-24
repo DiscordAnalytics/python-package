@@ -1,4 +1,5 @@
 import asyncio
+from collections import Counter
 from datetime import datetime
 from typing import Literal
 import discord
@@ -239,24 +240,21 @@ class DiscordAnalytics():
       await asyncio.sleep(30 if "--dev" in sys.argv else 300)
 
   def calculate_guild_members_repartition(self):
-    result = {
-      "little": 0,
-      "medium": 0,
-      "big": 0,
-      "huge": 0
+    tresholds = {
+      "little": lambda count: count <= 100,
+      "medium": lambda count: 100 < count <= 500,
+      "big": lambda count: 500 < count <= 1500,
+      "huge": lambda count: count > 1500
     }
 
-    for guild in self.client.guilds:
-      if guild.member_count <= 100:
-        result["little"] += 1
-      elif 100 < guild.member_count <= 500:
-        result["medium"] += 1
-      elif 500 < guild.member_count <= 1500:
-        result["big"] += 1
-      else:
-        result["huge"] += 1
+    counter = Counter()
 
-    return result
+    for guild in self.client.guilds:
+      for key, condition in tresholds.items():
+        if condition(guild.member_count):
+          counter[key] += 1
+          break
+    return dict(counter)
 
   def track_interactions(self, interaction: discord.Interaction):
     if self.debug:
