@@ -1,6 +1,6 @@
 __title__ = 'discordanalytics'
 __author__ = "ValDesign"
 __license__ = "MIT"
-__version__ = "3.2.0"
+__version__ = "3.5.0"
 
 from .client import *
