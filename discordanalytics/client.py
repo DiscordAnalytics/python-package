@@ -240,7 +240,7 @@ class DiscordAnalytics():
       await asyncio.sleep(30 if "--dev" in sys.argv else 300)
 
   def calculate_guild_members_repartition(self):
-    tresholds = {
+    thresholds = {
       "little": lambda count: count <= 100,
       "medium": lambda count: 100 < count <= 500,
       "big": lambda count: 500 < count <= 1500,
@@ -250,7 +250,7 @@ class DiscordAnalytics():
     counter = Counter()
 
     for guild in self.client.guilds:
-      for key, condition in tresholds.items():
+      for key, condition in thresholds.items():
         if condition(guild.member_count):
           counter[key] += 1
           break
