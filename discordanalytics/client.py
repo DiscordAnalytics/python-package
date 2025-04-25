@@ -55,7 +55,6 @@ class Event:
       print(f"[DISCORDANALYTICS] Incrementing event {self.event_key} by {count}")
     if not isinstance(count, int) or count < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
-    self.ensure()
     self.analytics.stats["custom_events"][self.event_key] += count
 
   def decrement(self, count: int = 1):
@@ -63,7 +62,6 @@ class Event:
       print(f"[DISCORDANALYTICS] Decrementing event {self.event_key} by {count}")
     if not isinstance(count, int) or count < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
-    self.ensure()
     self.analytics.stats["custom_events"][self.event_key] -= count
 
   def set(self, value: int):
@@ -71,7 +69,6 @@ class Event:
       print(f"[DISCORDANALYTICS] Setting event {self.event_key} to {value}")
     if not isinstance(value, int) or value < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
-    self.ensure()
     self.analytics.stats["custom_events"][self.event_key] = value
 
   def get(self):
@@ -79,7 +76,6 @@ class Event:
       print(f"[DISCORDANALYTICS] Getting event {self.event_key}")
     if not isinstance(self.event_key, str) or len(self.event_key) < 1 or len(self.event_key) > 50:
       raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
-    self.ensure()
     return self.analytics.stats["custom_events"][self.event_key]
 
 class DiscordAnalytics():
