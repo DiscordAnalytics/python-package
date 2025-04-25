@@ -40,9 +40,8 @@ class Event:
       raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
     
     url = ApiEndpoints.EVENT_URL.replace(":id", str(self.analytics.client.user.id)).replace(":event_key", self.event_key)
-    body = { "event": self.event_key, "count": 0 }
 
-    self.analytics.api_call_with_retries("POST", url, self.analytics.headers, body)
+    self.analytics.api_call_with_retries("GET", url, self.analytics.headers)
     
     if self.event_key not in self.analytics.stats["custom_events"]:
       self.analytics.stats["custom_events"][self.event_key] = 0
