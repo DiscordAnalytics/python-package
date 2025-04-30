@@ -59,7 +59,7 @@ class Event:
   def decrement(self, count: int = 1):
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Decrementing event {self.event_key} by {count}")
-    if not isinstance(count, int) or count < 0:
+    if not isinstance(count, int) or count < 0 or self.get() - count < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
     self.analytics.stats["custom_events"][self.event_key] -= count
 
