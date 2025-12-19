@@ -185,7 +185,7 @@ class DiscordAnalytics():
       print("[DISCORDANALYTICS] Instance successfully initialized")
 
     if self.debug:
-      if "--dev" in sys.argv:
+      if "--fast" in sys.argv:
         print("[DISCORDANALYTICS] Fast mode is enabled. Stats will be sent every 30s.")
       else:
         print("[DISCORDANALYTICS] Fast mode is disabled. Stats will be sent every 5 minutes.")
