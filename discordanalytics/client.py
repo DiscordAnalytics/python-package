@@ -30,38 +30,43 @@ class Event:
   def __init__(self, analytics, event_key: str):
     self.analytics = analytics
     self.event_key = event_key
+    self.last_action = ""
 
     self.ensure()
 
-  def ensure(self):
-    if self.analytics.debug:
-      print(f"[DISCORDANALYTICS] Ensuring event {self.event_key} exists")
+  async def ensure(self):
     if not isinstance(self.event_key, str) or len(self.event_key) < 1 or len(self.event_key) > 50:
       raise ValueError(ErrorCodes.INVALID_EVENTS_COUNT)
-    
+
+    if self.event_key not in self.analytics.stats["custom_events"]:
+      if self.analytics.debug:
+        print(f"[DISCORDANALYTICS] Fetching value for event {self.event_key}")
+
     url = ApiEndpoints.EVENT_URL.replace(":id", str(self.analytics.client.user.id)).replace(":event_key", self.event_key)
 
-    self.analytics.api_call_with_retries("GET", url, self.analytics.headers)
+    res = await self.analytics.api_call_with_retries("GET", url, self.analytics.headers)
     
-    if self.event_key not in self.analytics.stats["custom_events"]:
-      self.analytics.stats["custom_events"][self.event_key] = 0
+    if res is not None and self.last_action != 'set':
+      self.analytics.stats["custom_events"][self.event_key] = (self.analytics.stats["custom_events"].get(self.event_key, 0) + (await res.json()).get("value", 0))
 
     if self.analytics.debug:
-      print(f"[DISCORDANALYTICS] Event {self.event_key} ensured")
+      print(f"[DISCORDANALYTICS] Value fetched for event {self.event_key}")
 
   def increment(self, count: int = 1):
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Incrementing event {self.event_key} by {count}")
     if not isinstance(count, int) or count < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
-    self.analytics.stats["custom_events"][self.event_key] += count
+    self.analytics.stats["custom_events"][self.event_key] = self.analytics.stats["custom_events"].get(self.event_key, 0) + count
+    self.last_action = "increment"
 
   def decrement(self, count: int = 1):
     if self.analytics.debug:
       print(f"[DISCORDANALYTICS] Decrementing event {self.event_key} by {count}")
     if not isinstance(count, int) or count < 0 or self.get() - count < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
-    self.analytics.stats["custom_events"][self.event_key] -= count
+    self.analytics.stats["custom_events"][self.event_key] = self.analytics.stats["custom_events"].get(self.event_key, 0) - count
+    self.last_action = "decrement"
 
   def set(self, value: int):
     if self.analytics.debug:
@@ -69,6 +74,7 @@ class Event:
     if not isinstance(value, int) or value < 0:
       raise ValueError(ErrorCodes.INVALID_VALUE_TYPE)
     self.analytics.stats["custom_events"][self.event_key] = value
+    self.last_action = "set"
 
   def get(self):
     if self.analytics.debug:
@@ -180,9 +186,9 @@ class DiscordAnalytics():
 
     if self.debug:
       if "--dev" in sys.argv:
-        print("[DISCORDANALYTICS] DevMode is enabled. Stats will be sent every 30s.")
+        print("[DISCORDANALYTICS] Fast mode is enabled. Stats will be sent every 30s.")
       else:
-        print("[DISCORDANALYTICS] DevMode is disabled. Stats will be sent every 5 minutes.")
+        print("[DISCORDANALYTICS] Fast mode is disabled. Stats will be sent every 5 minutes.")
 
     if not self.chunk_guilds:
       await self.load_members_for_all_guilds()
@@ -252,10 +258,10 @@ class DiscordAnalytics():
           "other": 0,
           "private_message": 0
         },
-        "custom_events": {},
+        "custom_events": self.stats["custom_events"],
       }
 
-      await asyncio.sleep(30 if "--dev" in sys.argv else 300)
+      await asyncio.sleep(30 if "--fast" in sys.argv else 300)
 
   def calculate_guild_members_repartition(self):
     thresholds = {
