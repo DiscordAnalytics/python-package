@@ -117,6 +117,7 @@ class DiscordAnalytics():
         "private_message": 0
       },
       "custom_events": {}, # {[event_key:str]: int}
+      "user_install_count": 0,
     }
 
   def track_events(self):
@@ -226,6 +227,7 @@ class DiscordAnalytics():
 
       guild_count = len(self.client.guilds)
       user_count = len(self.client.users)
+      user_install_count = self.client.application.approximate_user_install_count
 
       url = ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id))
       headers = self.headers
@@ -259,6 +261,7 @@ class DiscordAnalytics():
           "private_message": 0
         },
         "custom_events": self.stats["custom_events"],
+        "user_install_count": user_install_count,
       }
 
       await asyncio.sleep(30 if "--fast" in sys.argv else 300)
