@@ -8,8 +8,9 @@ import aiohttp
 import discord
 from discord.client import Client
 from discord.enums import InteractionType
-from discord.guild import Guild, Member
+from discord.guild import Guild
 from discord.interactions import Interaction
+from discord.member import Member
 from discord.types.interactions import (
     ApplicationCommandInteractionData,
     MessageComponentInteractionData,
