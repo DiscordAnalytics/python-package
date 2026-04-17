@@ -439,7 +439,7 @@ class Event:
         if res is not None and self.last_action != "set":
             self.analytics.stats.customEvents[self.event_key] = (
                 self.analytics.stats.customEvents.get(self.event_key, 0)
-                + (await res.json()).get("value", 0)
+                + (await res.json()).get("currentValue", 0)
             )
 
         if self.analytics.debug:
