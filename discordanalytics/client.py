@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     )
 
 from .__init__ import __version__
-from .types import GuildStat, InteractionStat, LocaleStat, Stats
+from .types import GuildStat, InteractionStat, LocaleStat, Stats, GuildMembers
 
 
 class ApiEndpoints:
@@ -214,26 +214,26 @@ class DiscordAnalytics:
                 guildCount=guild_count,
                 userCount=user_count,
                 userInstallCount=user_install_count,
+                guildMembers=self.calculate_guild_members_repartition()
             )
 
             await asyncio.sleep(30 if "--fast" in sys.argv else 300)
 
-    def calculate_guild_members_repartition(self):
-        thresholds = {
-            "little": lambda count: count <= 100,
-            "medium": lambda count: 100 < count <= 500,
-            "big": lambda count: 500 < count <= 1500,
-            "huge": lambda count: count > 1500,
-        }
-
-        counter = Counter()
+    def calculate_guild_members_repartition(self) -> GuildMembers:
+        repartition = GuildMembers()
 
         for guild in self.client.guilds:
-            for key, condition in thresholds.items():
-                if condition(guild.member_count):
-                    counter[key] += 1
-                    break
-        return dict(counter)
+            count = guild.member_count or 0
+            if count <= 100:
+                repartition.little += 1
+            elif count <= 500:
+                repartition.medium += 1
+            elif count <= 1500:
+                repartition.big += 1
+            else:
+                repartition.huge += 1
+
+        return repartition
 
     def track_interactions(self, interaction: Interaction):
         if self.debug:
@@ -320,6 +320,28 @@ class DiscordAnalytics:
                     )
                 )
 
+        guild_id = str(interaction.guild.id) if interaction.guild else "dm"
+        guild_icon = interaction.guild.icon.key if interaction.guild and interaction.guild.icon else None
+
+        guild_data = next(
+            (x for x in self.stats.guilds if x.guildId == guild_id),
+            None,
+        )
+
+        if guild_data:
+            guild_data.interactions += 1
+            guild_data.icon = guild_icon
+        else:
+            self.stats.guilds.append(
+                GuildStat(
+                    guildId=guild_id,
+                    icon=guild_icon,
+                    interactions=1,
+                    members=interaction.guild.member_count if interaction.guild else 0,
+                    name=interaction.guild.name if interaction.guild else "DM",
+                )
+            )
+
         if interaction.guild is None:
             self.stats.usersType.privateMessage += 1
         else:
@@ -344,29 +366,6 @@ class DiscordAnalytics:
                             )
                         )
             self.stats.guildLocales = guildLocales
-
-            guild_data = next(
-                (
-                    x
-                    for x in self.stats.guilds
-                    if x.guildId == str(interaction.guild.id)
-                ),
-                None,
-            )
-            guild_icon = interaction.guild.icon.key if interaction.guild.icon else None
-            if guild_data:
-                guild_data.interactions += 1
-                guild_data.icon = guild_icon
-            else:
-                self.stats.guilds.append(
-                    GuildStat(
-                        guildId=str(interaction.guild.id),
-                        icon=guild_icon,
-                        interactions=1,
-                        members=interaction.guild.member_count or 0,
-                        name=interaction.guild.name,
-                    )
-                )
 
             guild_member = cast(Member, interaction.user)
             if (
