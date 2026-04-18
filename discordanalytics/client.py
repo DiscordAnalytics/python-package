@@ -199,7 +199,7 @@ class DiscordAnalytics:
 
             endpoint = ApiEndpoints.STATS_URL.replace(":id", str(self.client.user.id))
             headers = self.headers
-            json = self.stats
+            json = asdict(self.stats)
 
             await self.api_call_with_retries("POST", endpoint, headers, json)
 
