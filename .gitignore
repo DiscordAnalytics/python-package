@@ -4,3 +4,4 @@ tests/
 .vscode/
 *.egg-info/
 .idea
+.env
