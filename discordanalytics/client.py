@@ -2,7 +2,7 @@ import asyncio
 import sys
 from collections import Counter
 from datetime import datetime
-from typing import List, Literal, cast
+from typing import List, Literal, cast, TYPE_CHECKING
 
 import aiohttp
 import discord
@@ -11,10 +11,13 @@ from discord.enums import InteractionType
 from discord.guild import Guild
 from discord.interactions import Interaction
 from discord.member import Member
-from discord.types.interactions import (
-    ApplicationCommandInteractionData,
-    MessageComponentInteractionData,
-)
+from dataclasses import asdict
+
+if TYPE_CHECKING:
+    from discord.types.interactions import (
+        ApplicationCommandInteractionData,
+        MessageComponentInteractionData,
+    )
 
 from .__init__ import __version__
 from .types import GuildStat, InteractionStat, LocaleStat, Stats
@@ -262,7 +265,7 @@ class DiscordAnalytics:
             }
             and interaction.data
         ):
-            cmd_data = cast(ApplicationCommandInteractionData, interaction.data)
+            cmd_data = cast("ApplicationCommandInteractionData", interaction.data)
             cmd_type = cmd_data.get("type", 1)
             interaction_data = next(
                 (
@@ -293,7 +296,7 @@ class DiscordAnalytics:
             }
             and interaction.data
         ):
-            component_data = cast(MessageComponentInteractionData, interaction.data)
+            component_data = cast("MessageComponentInteractionData", interaction.data)
             interaction_data = next(
                 (
                     x
