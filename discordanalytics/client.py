@@ -2,7 +2,7 @@ import asyncio
 import sys
 from collections import Counter
 from datetime import datetime
-from typing import List, Literal, cast, TYPE_CHECKING
+from typing import List, Literal, cast, Any, Dict, Optional, TYPE_CHECKING
 
 import aiohttp
 import discord
@@ -93,7 +93,7 @@ class DiscordAnalytics:
 
     async def api_call_with_retries(
         self, method, endpoint, headers, json, max_retries=5, backoff_factor=0.5
-    ):
+    ) -> Optional[Dict[str, Any]]:
         retries = 0
         while retries < max_retries:
             try:
@@ -102,7 +102,10 @@ class DiscordAnalytics:
                         method, self.api_url + endpoint, headers=headers, json=json
                     ) as response:
                         if response.status == 200:
-                            return response
+                            try:
+                                return await response.json()
+                            except Exception:
+                                return None
                         elif response.status == 401:
                             raise ValueError(ErrorCodes.INVALID_API_TOKEN)
                         elif response.status == 423:
@@ -412,12 +415,12 @@ class DiscordAnalytics:
 
 
 class Event:
-    async def __init__(self, analytics: DiscordAnalytics, event_key: str):
+    def __init__(self, analytics: DiscordAnalytics, event_key: str):
         self.analytics = analytics
         self.event_key = event_key
         self.last_action = ""
 
-        await self.ensure()
+        asyncio.create_task(self.ensure())
 
     async def ensure(self):
         if (
@@ -436,14 +439,14 @@ class Event:
             ":id", str(self.analytics.client.user.id)
         ).replace(":event_key", self.event_key)
 
-        res = await self.analytics.api_call_with_retries(
+        data = await self.analytics.api_call_with_retries(
             "GET", endpoint, self.analytics.headers, {}
         )
 
-        if res is not None and self.last_action != "set":
+        if data is not None and self.last_action != "set":
             self.analytics.stats.customEvents[self.event_key] = (
-                self.analytics.stats.customEvents.get(self.event_key, 0)
-                + (await res.json()).get("currentValue", 0)
+                    self.analytics.stats.customEvents.get(self.event_key, 0)
+                    + data.get("currentValue", 0)
             )
 
         if self.analytics.debug:
